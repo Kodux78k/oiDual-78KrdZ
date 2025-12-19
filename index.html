@@ -1,280 +1,394 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>WarpVault v9.2 · KOBLLUX</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Dual.Vault v9 - Warframe</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap');
 
-  <!-- PWA -->
-  <link rel="manifest" href="./manifest.web.json"/>
-  <link rel="icon" href="./icone-192.png" type="image/png"/>
-<script>
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js")
-      .then(() => console.log("%c[PWA] Service Worker ativo.","color:lime"))
-      .catch(err => console.log("SW falhou:", err));
-  });
+:root {
+    --bg: #050505;
+    --glass: rgba(30, 30, 30, 0.4);
+    --border: rgba(255, 255, 255, 0.08);
+    --neon-p: #d946ef; /* Magenta Cyber */
+    --neon-o: #f97316; /* Laranja Hub */
+    --neon-b: #3b82f6; /* Azul Warframe */
 }
-</script>
-  <!-- Fonte & base -->
-  <style>
-    :root {
-      --bg: rgba(0,0,0,0.96);
-      --glass: rgba(255,255,255,0.08);
-      --blur: blur(10px);
-      --radius: 14px;
-      --txt: #e9e9e9;
-    }
 
-    body {
-      background: var(--bg);
-      font-family: system-ui, sans-serif;
-      color: var(--txt);
-      margin: 0;
-      padding: 0;
-    }
+body {
+    background: var(--bg);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 20px 10px; min-height: 100vh; color: #e2e8f0;
+    overflow-x: hidden;
+}
 
-    header {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      padding: 10px;
-      backdrop-filter: var(--blur);
-      background: var(--glass);
-    }
+/* --- CARD SYSTEM --- */
+.master-card {
+    width: 100%; max-width: 460px;
+    background: var(--glass); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border-radius: 24px; border: 1px solid var(--border);
+    margin-bottom: 16px; position: relative; overflow: hidden;
+    transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
 
-    header svg {
-      height: 32px;
-      width: 32px;
-      cursor: pointer;
-      transition: .2s;
-    }
+/* Aura de Seleção */
+.master-card:focus-within { border-color: var(--neon-b); box-shadow: 0 0 15px rgba(59, 130, 246, 0.2); }
 
-    header svg:hover {
-      transform: scale(1.15);
-    }
+.inner { padding: 14px; }
 
-    .container {
-      padding: 20px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 20px;
-    }
+/* HEADER */
+.header { display: flex; justify-content: space-between; align-items: center; min-height: 44px; }
+.title-group { flex-grow: 1; cursor: pointer; display: flex; flex-direction: column; overflow: hidden; }
+.card-title { font-weight: 800; font-size: 14px; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-meta { font-size: 10px; color: #94a3b8; font-family: 'JetBrains Mono', monospace; display: flex; gap: 8px; align-items: center; margin-top: 2px;}
+.tag-badge { background: rgba(255,255,255,0.1); padding: 1px 6px; border-radius: 4px; color: var(--neon-p); }
 
-    .card {
-      width: 260px;
-      min-height: 200px;
-      background: var(--glass);
-      backdrop-filter: var(--blur);
-      border-radius: var(--radius);
-      padding: 12px;
-      border: 1px solid rgba(255,255,255,0.15);
-      display: flex;
-      flex-direction: column;
-    }
+/* DOCK DE AÇÃO */
+.dock { display: flex; gap: 6px; align-items: center; padding-left: 8px;}
+.ico {
+    width: 34px; height: 34px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);
+    color: #cbd5e1; cursor: pointer; transition: all 0.2s;
+    flex-shrink: 0;
+}
+.ico:hover { background: rgba(255,255,255,0.1); color: white; transform: scale(1.05); }
+.ico:active { transform: scale(0.95); }
 
-    .card textarea {
-      flex: 1;
-      background: transparent;
-      border: none;
-      resize: none;
-      color: var(--txt);
-      font-size: 15px;
-    }
+/* CORES DE AÇÃO */
+.ico.flash { color: var(--neon-o); border-color: rgba(249, 115, 22, 0.3); }
+.ico.tts { color: var(--neon-b); }
+.ico.share { color: #10b981; }
+.ico.del:hover { background: #ef4444; color: white; border-color: #ef4444; }
 
-    .actions {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 10px;
-    }
+/* CONTEÚDO EXPANSÍVEL */
+.content-box {
+    max-height: 0; overflow: hidden; opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.expanded .content-box { max-height: 800px; opacity: 1; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 
-    .actions button {
-      border: none;
-      background: rgba(255,255,255,0.08);
-      padding: 6px 10px;
-      border-radius: 6px;
-      cursor: pointer;
-      color: var(--txt);
-      font-size: 12px;
-    }
+/* INPUTS & WARFRAME */
+.code-area {
+    width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px; color: #e2e8f0;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.5;
+    outline: none; resize: vertical; min-height: 100px;
+}
+.warframe-view {
+    width: 100%; height: 200px; border: none; background: white;
+    border-radius: 12px; margin-top: 8px;
+}
 
-    /* Presets */
-    .card[data-style="blue"] {
-      border-color: #4ea8ff;
-    }
-    .card[data-style="red"] {
-      border-color: #ff6a6a;
-    }
-    .card[data-style="green"] {
-      border-color: #6affb7;
-    }
-    .card[data-style="gold"] {
-      border-color: #ffc94e;
-    }
+/* CAMADA EXTERNA (Inject Outside) */
+#ext-layer { width: 100%; max-width: 460px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px; }
+.ext-card-wrap { animation: slideIn 0.3s ease; }
 
-    /* DUO/TRINITY layers */
-    .uno {}
-    .duo { outline: 1px dashed rgba(255,255,255,0.2); }
-    .trinity { box-shadow: 0 0 12px rgba(255,255,255,0.25); }
+@keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 
-    /* Log container */
-    .log {
-      font-size: 11px;
-      opacity: .7;
-      margin-top: 6px;
-      line-height: 1.2;
-      max-height: 60px;
-      overflow-y: auto;
-      background: rgba(255,255,255,0.05);
-      padding: 4px;
-      border-radius: 4px;
-    }
+/* GROUP FILTER */
+.filter-bar {
+    width: 100%; max-width: 460px; display: flex; gap: 10px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px;
+}
+.filter-pill {
+    background: var(--glass); border: 1px solid var(--border); color: #94a3b8;
+    padding: 6px 16px; border-radius: 20px; font-size: 11px; font-weight: 600;
+    cursor: pointer; white-space: nowrap; transition: 0.2s;
+}
+.filter-pill.active { background: var(--neon-p); color: white; border-color: var(--neon-p); }
 
-    #pasteGlobal {
-      position: fixed;
-      bottom: 14px;
-      right: 14px;
-      background: rgba(255,255,255,0.15);
-      padding: 12px 18px;
-      border-radius: 14px;
-      cursor: pointer;
-      border: none;
-      backdrop-filter: blur(8px);
-      color: var(--txt);
-    }
-  </style>
+</style>
 </head>
-
 <body>
 
-<header>
-  <!-- SVG icons restored aesthetic -->
-  <svg viewBox="0 0 24 24" id="addCard">
-    <path fill="currentColor" d="M19 11H13V5h-2v6H5v2h6v6h2v-6h6z"/>
-  </svg>
+<div id="ext-layer"></div>
 
-  <svg viewBox="0 0 24 24" id="saveAll">
-    <path fill="currentColor" d="M17 3H7a2 2 0 0 0-2 2v14l7-3l7 3V5a2 2 0 0 0-2-2z"/>
-  </svg>
+<div class="filter-bar" id="filterBar">
+    <div class="filter-pill active" onclick="filterVault('ALL')">ALL</div>
+    <div class="filter-pill" onclick="filterVault('CODE')">CODE</div>
+    <div class="filter-pill" onclick="filterVault('DOCS')">DOCS</div>
+</div>
 
-  <svg viewBox="0 0 24 24" id="loadAll">
-    <path fill="currentColor" d="M12 3l8 8h-6v8H10v-8H4z"/>
-  </svg>
+<div class="master-card" id="main">
+    <div class="inner">
+        <div class="header">
+            <div class="title-group" onclick="toggle('main')">
+                <span class="card-title" style="letter-spacing: 1px; color: var(--neon-o);">⚡ INFINITY INJECTOR</span>
+                <span class="card-meta">WARFRAME_READY • v9.0</span>
+            </div>
+            <div class="dock">
+                <button class="ico flash" onclick="magicPaste()" title="Clipboard Turbo Save">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+                </button>
+                <button class="ico" onclick="toggle('main')">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+            </div>
+        </div>
+        
+        <div class="content-box">
+            <div style="position: relative;">
+                <textarea id="mainInput" class="code-area" rows="4" placeholder="Cole código, HTML ou texto aqui..."></textarea>
+                <button onclick="pasteToInput()" style="position: absolute; bottom: 8px; right: 8px; background: var(--neon-p); color: white; border: none; padding: 4px 10px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: pointer;">
+                    PASTE
+                </button>
+            </div>
+            
+            <div style="display: flex; gap: 8px; margin-top: 10px;">
+                <input id="mainGroup" placeholder="Grupo (ex: DOCS)" style="background:transparent; border:1px solid var(--border); color:white; padding:8px; border-radius:8px; width: 30%; font-size: 11px;">
+                
+                <button class="ico" style="flex:1; border-radius: 8px; width:auto; font-size: 11px; font-weight:700; gap:6px;" onclick="saveManual()">
+                    SALVAR CARD
+                </button>
+                <button class="ico" style="flex:1; border-radius: 8px; width:auto; font-size: 11px; font-weight:700; gap:6px; color: var(--neon-b); border-color: rgba(59,130,246,0.3);" onclick="injectExternal()">
+                    INJETAR FORA
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
-  <svg viewBox="0 0 24 24" id="clearAll">
-    <path fill="currentColor" d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6z"/>
-  </svg>
-</header>
-
-<div class="container" id="cards"></div>
-
-<button id="pasteGlobal">Colar texto</button>
+<div id="vault" style="width: 100%; max-width: 460px;"></div>
 
 <script>
-/* STATE */
-let storageKey = "warpVault-v9";
-let cards = [];
+let items = JSON.parse(localStorage.getItem('vault_v9') || '[]');
+let currentFilter = 'ALL';
+let editingId = null;
 
-function createCard(style="blue", layer="uno") {
-  const id = Date.now();
-  const card = {
-    id,
-    style,
-    layer,
-    text: "",
-    log: []
-  };
-  cards.push(card);
-  renderCards();
+// --- SISTEMA DE RENDERIZAÇÃO ---
+function render() {
+    const v = document.getElementById('vault');
+    const filtered = currentFilter === 'ALL' ? items : items.filter(i => (i.group || '').toUpperCase() === currentFilter);
+    
+    v.innerHTML = filtered.map(i => {
+        const isEditing = editingId === i.id;
+        
+        // MODO EDIÇÃO
+        if (isEditing) {
+            return `
+            <div class="master-card expanded" id="card-${i.id}">
+                <div class="inner">
+                    <div class="header">
+                        <input id="edit-title-${i.id}" value="${i.title}" class="code-area" style="height:34px; min-height:auto; padding:5px 10px; width: 60%;">
+                        <input id="edit-group-${i.id}" value="${i.group||''}" class="code-area" style="height:34px; min-height:auto; padding:5px 10px; width: 20%; margin-left:5px;">
+                        <div class="dock" style="margin-left: auto;">
+                            <button class="ico flash" onclick="saveEdit(${i.id})">✓</button>
+                        </div>
+                    </div>
+                    <div class="content-box" style="opacity:1; max-height:none;">
+                        <textarea id="edit-content-${i.id}" class="code-area" rows="8">${i.content}</textarea>
+                    </div>
+                </div>
+            </div>`;
+        }
+        
+        // MODO VISUALIZAÇÃO
+        return `
+        <div class="master-card" id="card-${i.id}">
+            <div class="inner">
+                <div class="header">
+                    <div class="title-group" onclick="toggle('card-${i.id}')">
+                        <div style="display:flex; justify-content:space-between; width:100%;">
+                            <span class="card-title">${i.title}</span>
+                            <span class="card-meta">${i.date.split(' ')[0]}</span>
+                        </div>
+                        <span class="card-meta">
+                            ${i.group ? `<span class="tag-badge">${i.group}</span>` : ''} 
+                            ID:${i.id.toString().slice(-4)}
+                        </span>
+                    </div>
+                    
+                    <div class="dock">
+                        <button class="ico tts" onclick="event.stopPropagation(); speakCard(${i.id})">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+                        </button>
+
+                        <button class="ico share" onclick="event.stopPropagation(); shareCard(${i.id})">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                        </button>
+
+                        <button class="ico" onclick="event.stopPropagation(); toggleRender(${i.id})">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                        </button>
+
+                        <button class="ico" onclick="event.stopPropagation(); startEdit(${i.id})">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                        </button>
+
+                         <button class="ico del" onclick="event.stopPropagation(); deleteCard(${i.id})">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="content-box" id="box-${i.id}">
+                    <textarea readonly class="code-area" id="txt-${i.id}" style="border:none; padding:0; background:transparent;">${i.content}</textarea>
+                    <div id="frame-container-${i.id}" style="display:none;"></div>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
 }
 
-function renderCards() {
-  const container = document.getElementById("cards");
-  container.innerHTML = "";
-  cards.forEach(card => {
-    const div = document.createElement("div");
-    div.className = `card ${card.layer}`;
-    div.dataset.style = card.style;
-    div.innerHTML = `
-      <textarea>${card.text}</textarea>
-      <div class="actions">
-        <button data-act="save" data-id="${card.id}">Salvar</button>
-        <button data-act="edit" data-id="${card.id}">Editar</button>
-        <button data-act="dup" data-id="${card.id}">Duplicar</button>
-      </div>
-      <div class="log">
-        ${card.log.map(l => `<div>${l}</div>`).join("")}
-      </div>
-    `;
-    container.appendChild(div);
-  });
+// --- FUNÇÕES DE LÓGICA ---
+
+// 1. Alternar Card
+function toggle(id) {
+    if(editingId && editingId !== `card-${id}` && id !== 'main') cancelEdit();
+    document.getElementById(id).classList.toggle('expanded');
 }
 
-/* SAVE / LOAD */
-function save() {
-  localStorage.setItem(storageKey, JSON.stringify(cards));
+// 2. Criação
+function saveManual() {
+    const text = document.getElementById('mainInput').value;
+    const group = document.getElementById('mainGroup').value;
+    if(text) { createCard(text, group); document.getElementById('mainInput').value = ''; toggle('main'); }
 }
 
-function load() {
-  const data = localStorage.getItem(storageKey);
-  if(!data) return;
-  cards = JSON.parse(data);
-  renderCards();
+async function magicPaste() {
+    try {
+        const text = await navigator.clipboard.readText();
+        if(!text) return alert("Clipboard Vazio");
+        createCard(text, "CLIPBOARD");
+        speak("Card Criado");
+    } catch(e) { alert("Permissão de colar negada"); }
 }
 
-function clear() {
-  localStorage.removeItem(storageKey);
-  cards = [];
-  renderCards();
+async function pasteToInput() {
+    try {
+        const text = await navigator.clipboard.readText();
+        document.getElementById('mainInput').value += text;
+    } catch(e) { alert("Permissão negada"); }
 }
 
-/* LOGGER */
-function logCard(id, msg) {
-  const card = cards.find(c=>c.id==id);
-  if(!card) return;
-  card.log.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
-}
-
-/* EVENTS */
-document.addEventListener("click", e=>{
-  if(e.target.id==="addCard") createCard();
-  if(e.target.id==="saveAll") save();
-  if(e.target.id==="loadAll") load();
-  if(e.target.id==="clearAll") clear();
-
-  if(e.target.dataset.act==="save") {
-    const id = parseInt(e.target.dataset.id);
-    const card = cards.find(c=>c.id==id);
-    card.text = e.target.closest(".card").querySelector("textarea").value;
-    logCard(id, "Salvo");
+function createCard(content, group = "") {
+    const lines = content.trim().split('\n');
+    const title = lines[0].substring(0, 35).replace(/[#<*]/g,'').trim() || "Sem Título";
+    const item = { 
+        id: Date.now(), 
+        title, 
+        content, 
+        group: group.toUpperCase(), 
+        date: new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR').slice(0,5) 
+    };
+    items.unshift(item);
     save();
-    renderCards();
-  }
+}
 
-  if(e.target.dataset.act==="edit") {
-    const id = parseInt(e.target.dataset.id);
-    logCard(id, "Edição iniciada");
-    renderCards();
-  }
+// 3. Compartilhar (WhatsApp etc)
+async function shareCard(id) {
+    const item = items.find(i => i.id === id);
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: item.title,
+                text: item.content
+            });
+        } catch (err) { console.log('Share cancelado'); }
+    } else {
+        // Fallback: Copiar
+        navigator.clipboard.writeText(item.content);
+        alert("Copiado para Clipboard (Share não suportado)");
+    }
+}
 
-  if(e.target.dataset.act==="dup") {
-    const id = parseInt(e.target.dataset.id);
-    const card = cards.find(c=>c.id==id);
-    createCard(card.style, card.layer);
-  }
-});
+// 4. TTS (Fala)
+function speakCard(id) {
+    const item = items.find(i => i.id === id);
+    speak(item.content);
+}
 
-/* GLOBAL PASTE */
-document.getElementById("pasteGlobal").onclick = async ()=>{
-  const text = await navigator.clipboard.readText();
-  createCard("gold", "trinity");
-  cards[cards.length-1].text = text;
-  renderCards();
-};
+function speak(txt) {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(txt);
+    u.lang = "pt-BR"; u.rate = 1.2;
+    window.speechSynthesis.speak(u);
+}
 
-load();
+// 5. Warframe / Render
+function toggleRender(id) {
+    const txt = document.getElementById(`txt-${id}`);
+    const frameBox = document.getElementById(`frame-container-${id}`);
+    const item = items.find(i => i.id === id);
+
+    if (frameBox.style.display === 'none') {
+        // Ativar Warframe
+        txt.style.display = 'none';
+        frameBox.style.display = 'block';
+        frameBox.innerHTML = `<iframe class="warframe-view" srcdoc="${item.content.replace(/"/g, '&quot;')}" sandbox="allow-scripts"></iframe>`;
+    } else {
+        // Voltar p/ Código
+        txt.style.display = 'block';
+        frameBox.style.display = 'none';
+        frameBox.innerHTML = '';
+    }
+}
+
+// 6. Inject Outside (Visual Card Style)
+function injectExternal() {
+    const val = document.getElementById('mainInput').value;
+    const title = val.split('\n')[0].substring(0,20) || "External";
+    
+    // Cria a estrutura visual do card
+    const cardHTML = `
+        <div class="master-card ext-card-wrap">
+            <div class="inner">
+                <div class="header">
+                     <span class="card-title" style="color:var(--neon-b)">🚀 ${title}</span>
+                     <div class="dock"><button class="ico del" onclick="this.closest('.ext-card-wrap').remove()">×</button></div>
+                </div>
+                <div style="margin-top:10px; color:#ccc; font-size:13px;">
+                    ${val} 
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const d = document.createElement('div');
+    d.innerHTML = cardHTML;
+    document.getElementById('ext-layer').appendChild(d);
+    document.getElementById('mainInput').value = '';
+}
+
+// --- CRUD ---
+function startEdit(id) { editingId = id; render(); document.getElementById(`card-${id}`).classList.add('expanded'); }
+function cancelEdit() { editingId = null; render(); }
+
+function saveEdit(id) {
+    const item = items.find(i => i.id === id);
+    item.title = document.getElementById(`edit-title-${id}`).value;
+    item.group = document.getElementById(`edit-group-${id}`).value.toUpperCase();
+    item.content = document.getElementById(`edit-content-${id}`).value;
+    item.date = new Date().toLocaleDateString() + " (Edit)";
+    editingId = null;
+    save();
+}
+
+function deleteCard(id) {
+    if(confirm('Deletar Card?')) {
+        items = items.filter(i => i.id !== id);
+        save();
+    }
+}
+
+function filterVault(filter) {
+    currentFilter = filter;
+    document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+    event.target.classList.add('active');
+    render();
+}
+
+function save() {
+    localStorage.setItem('vault_v9', JSON.stringify(items));
+    render();
+}
+
+// Init
+render();
 </script>
-
 </body>
 </html>
