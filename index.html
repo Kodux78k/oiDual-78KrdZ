@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Dual.Vault v9.1 - Unbound</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#050505">
+<link rel="apple-touch-icon" href="./icon-192.png">
+
+<script src="https://cdn.jsdelivr.net/npm/dompurify@2.4.0/dist/purify.min.js"></script>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/xml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/json.min.js"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap');
+
+:root {
+    --bg: #050505;
+    --glass: rgba(30, 30, 30, 0.4);
+    --border: rgba(255, 255, 255, 0.08);
+    --neon-p: #23ac51;
+    --neon-o: #f97316;
+    --neon-b: #3b82f6;
+}
+
+body {
+    background: var(--bg);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 20px 10px; min-height: 100vh; color: #e2e8f0;
+    overflow-x: hidden;
+}
+
+/* --- CARD SYSTEM --- */
+.master-card { width: 100%; max-width: 460px; background: var(--glass); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border-radius: 24px; border: 1px solid var(--border); margin-bottom: 16px; position: relative; overflow: hidden; transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94); box-shadow: 0 8px 32px rgba(0,0,0,0.6); }
+.master-card:focus-within { border-color: var(--neon-b); box-shadow: 0 0 15px rgba(59, 130, 246, 0.2); }
+.inner { padding: 14px; }
+.header { display: flex; justify-content: space-between; align-items: center; min-height: 44px; }
+.title-group { flex-grow: 1; cursor: pointer; display: flex; flex-direction: column; overflow: hidden; }
+.card-title { font-weight: 800; font-size: 14px; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-meta { font-size: 10px; color: #94a3b8; font-family: 'JetBrains Mono', monospace; display: flex; gap: 8px; align-items: center; margin-top: 2px; }
+.tag-badge { background: rgba(255,255,255,0.1); padding: 1px 6px; border-radius: 4px; color: var(--neon-p); }
+
+/* DOCK DE AÇÃO */
+.dock { display: flex; gap: 6px; align-items: center; padding-left: 8px; }
+.ico { width: 34px; height: 34px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); color: #cbd5e1; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
+.ico:hover { background: rgba(255,255,255,0.1); color: white; transform: scale(1.05); }
+.ico:active { transform: scale(0.95); }
+.ico.flash { color: var(--neon-o); border-color: rgba(249, 115, 22, 0.3); }
+.ico.tts { color: var(--neon-b); }
+.ico.share { color: #10b981; }
+.ico.del:hover { background: #ef4444; color: white; border-color: #ef4444; }
+
+/* CONTEÚDO EXPANSÍVEL */
+.content-box { max-height: 0; overflow: hidden; opacity: 0; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+.expanded .content-box { max-height: 800px; opacity: 1; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+
+/* INPUTS & WARFRAME */
+.code-area { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 12px; padding: 12px; color: #e2e8f0; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.5; outline: none; resize: vertical; min-height: 100px; }
+/* Warframe (Iframe) agora branco por padrão para HTML, mas gerenciável via CSS interno se precisar */
+.warframe-view { width: 100%; height: 300px; border: none; background: #fff; border-radius: 12px; margin-top: 8px; }
+
+/* CAMADA EXTERNA (Inject Outside) */
+#ext-layer { width: 100%; max-width: 460px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px; }
+.ext-card-wrap { animation: slideIn 0.3s ease; }
+@keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* GROUP FILTER */
+.filter-bar { width: 100%; max-width: 460px; display: flex; gap: 10px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px; }
+.filter-pill { background: var(--glass); border: 1px solid var(--border); color: #94a3b8; padding: 6px 16px; border-radius: 20px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: 0.2s; }
+.filter-pill.active { background: var(--neon-p); color: white; border-color: var(--neon-p); }
+
+/* Syntax Highlighting Custom Fixes */
+pre { margin: 0; }
+.hljs { background: rgba(0,0,0,0.4) !important; border-radius: 8px; padding: 10px; font-size: 12px; font-family: 'JetBrains Mono', monospace; }
+</style>
+</head>
+<body>
+
+<div id="ext-layer"></div>
+
+<div class="filter-bar" id="filterBar">
+    <div class="filter-pill active" onclick="filterVault('ALL')">ALL</div>
+    <div class="filter-pill" onclick="filterVault('CODE')">CODE</div>
+    <div class="filter-pill" onclick="filterVault('DOCS')">DOCS</div>
+</div>
+
+<div class="master-card" id="main">
+    <div class="inner">
+        <div class="header">
+            <div class="title-group" onclick="toggle('main')">
+                <span class="card-title" style="letter-spacing: 1px; color: var(--neon-o);">⚡ INFINITY INJECTOR</span>
+                <span class="card-meta">WARFRAME_UNBOUND • v9.1</span>
+            </div>
+            <div class="dock">
+                <button class="ico flash" onclick="magicPaste()" title="Clipboard Turbo Save">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
+                </button>
+                <button class="ico" onclick="toggle('main')">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="content-box">
+            <div style="position: relative;">
+                <textarea id="mainInput" class="code-area" rows="4" placeholder="⍯ Digite ou Cole aqui…"></textarea>
+                <button onclick="pasteToInput()" style="position: absolute; bottom: 8px; right: 8px; background: var(--neon-p); color: white; border: none; padding: 4px 10px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: pointer;">
+                  ⍯
+                </button>
+            </div>
+
+            <div style="display: flex; gap: 8px; margin-top: 10px;">
+                <input id="mainGroup" placeholder="(StkZ)" style="background:transparent; border:1px solid var(--border); color:white; padding:8px; border-radius:8px; width: 20%; font-size: 11px;">
+
+                <button class="ico" style="flex:1; border-radius: 8px; width:auto; font-size: 11px; font-weight:700; gap:6px;" onclick="saveManual()">
+                   ☥ SAVE
+                </button>
+                <button class="ico" style="flex:1; border-radius: 8px; width:auto; font-size: 11px; font-weight:700; gap:6px; color: var(--neon-b); border-color: rgba(59,130,246,0.3);" onclick="injectExternal()">
+                   ╰↳ INJECT
+                </button>
+
+                <input type="file" id="importFile" accept=".json,.html,.md,.patch,.rds,.css,.js,.txt" style="display:none" onchange="importBackup(event)">
+                <button class="ico" style="flex:1; border-radius: 8px; font-size: 11px; font-weight:700;" onclick="document.getElementById('importFile').click()">
+                   ￬ IMPORT
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="vault" style="width: 100%; max-width: 460px;"></div>
+
+<script>
+/* Vault v9.1 — parser enhanced, permissions unlocked */
+
+let items = JSON.parse(localStorage.getItem('vault_v9') || '[]');
+let currentFilter = 'ALL';
+let editingId = null;
+
+/* Helper: safe-escape */
+function escapeAttr(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,"&#39;").replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* Sanitizador */
+function sanitizeHTML(htmlString) {
+  const parser = new DOMParser();
+  if (window.DOMPurify) {
+    // Permite mais tags para permitir renderização rica, mas bloqueia XSS óbvio
+    const clean = DOMPurify.sanitize(htmlString, {
+        ADD_TAGS: ['iframe', 'script', 'style'], 
+        ADD_ATTR: ['target', 'allow', 'allowfullscreen', 'sandbox']
+    }); 
+    return parser.parseFromString(clean, 'text/html').body;
+  }
+  const doc = parser.parseFromString(htmlString, 'text/html');
+  return doc.body;
+}
+
+/* Markdown -> DocumentFragment (Enhanced for Lang Detection) */
+function markdownToFragment(md) {
+  const frag = document.createDocumentFragment();
+  const lines = md.replace(/\r/g,'').split('\n');
+  let inCode = false;
+  let codeLang = '';
+  let codeBuf = [];
+  
+  lines.forEach(line => {
+    // Detecta início de bloco ```lang
+    if (line.trim().startsWith('```')) {
+      if (!inCode) { 
+        inCode = true; 
+        codeLang = line.trim().replace(/^```/, '').trim(); // Captura 'js', 'html', etc
+        codeBuf = []; 
+        return; 
+      } else {
+        // Fim do bloco
+        const pre = document.createElement('pre');
+        const code = document.createElement('code');
+        if(codeLang) code.className = `language-${codeLang}`;
+        code.textContent = codeBuf.join('\n');
+        pre.appendChild(code);
+        frag.appendChild(pre);
+        inCode = false;
+        codeLang = '';
+        return;
+      }
+    }
+    if (inCode) { codeBuf.push(line); return; }
+
+    // Headers
+    const hMatch = line.match(/^(#{1,6})\s*(.*)$/);
+    if (hMatch) {
+      const h = document.createElement('h' + hMatch[1].length);
+      h.innerHTML = inlineFormatting(hMatch[2]);
+      frag.appendChild(h);
+      return;
+    }
+    // Lists
+    const ulMatch = line.match(/^\s*[-*]\s+(.*)$/);
+    if (ulMatch) {
+      let last = frag.lastChild;
+      if (!last || last.tagName !== 'UL') {
+        const ul = document.createElement('ul');
+        frag.appendChild(ul);
+        last = ul;
+      }
+      const li = document.createElement('li');
+      li.innerHTML = inlineFormatting(ulMatch[1]);
+      last.appendChild(li);
+      return;
+    }
+    // HR
+    if (/^---+$/.test(line)) { frag.appendChild(document.createElement('hr')); return; }
+    // Paragraph
+    if (line.trim() !== '') {
+      const p = document.createElement('p');
+      p.innerHTML = inlineFormatting(line);
+      frag.appendChild(p);
+    } else {
+      frag.appendChild(document.createElement('br'));
+    }
+  });
+  return frag;
+}
+
+/* Inline formatting */
+function inlineFormatting(text) {
+  const esc = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  let out = esc.replace(/`([^`]+)`/g, (m, p1) => `<code style="background:rgba(255,255,255,0.1); padding:2px 4px; border-radius:4px; color:#f97316;">${p1}</code>`);
+  out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  out = out.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color:var(--neon-b); text-decoration:underline;">$1</a>');
+  return out;
+}
+
+/* Parse Content Type */
+function parseContent(content) {
+  const trimmed = (content || '').trim();
+  // JSON
+  if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+    try {
+      const obj = JSON.parse(trimmed);
+      const pre = document.createElement('pre');
+      const code = document.createElement('code');
+      code.className = 'language-json';
+      code.textContent = JSON.stringify(obj, null, 2);
+      pre.appendChild(code);
+      return { type: 'json', node: pre };
+    } catch(e) {}
+  }
+  // HTML-ish
+  if (/<[a-z][\s\S]*>/i.test(trimmed)) {
+    const sanitizedBody = sanitizeHTML(trimmed);
+    const frag = document.createDocumentFragment();
+    Array.from(sanitizedBody.childNodes).forEach(n => frag.appendChild(n.cloneNode(true)));
+    return { type: 'html', node: frag, raw: trimmed }; // pass raw for iframe
+  }
+  // Markdown / Code Blocks
+  if (/^#{1,6}\s+/m.test(trimmed) || /^\s*[-*]\s+/m.test(trimmed) || /`{3}/.test(trimmed)) {
+    return { type: 'markdown', node: markdownToFragment(trimmed) };
+  }
+  // Generic Code fallback
+  if (/^```/.test(trimmed)) {
+    const pre = document.createElement('pre');
+    const code = document.createElement('code');
+    const cleaned = trimmed.replace(/^```[a-z]*\n?/i,'').replace(/\n?```$/,'');
+    code.textContent = cleaned;
+    pre.appendChild(code);
+    return { type: 'code', node: pre };
+  }
+  // Text
+  const p = document.createElement('p');
+  p.textContent = content;
+  return { type: 'text', node: p };
+}
+
+/* Convert node to HTML string */
+function nodeToHTML(node) {
+  if (!node) return '';
+  if (node.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+    const tmp = document.createElement('div');
+    node.childNodes.forEach(n => tmp.appendChild(n.cloneNode(true)));
+    return tmp.innerHTML;
+  }
+  if (node.outerHTML) return node.outerHTML;
+  const tmp = document.createElement('div');
+  tmp.appendChild(node.cloneNode(true));
+  return tmp.innerHTML;
+}
+
+/* Toggle expansion */
+function toggle(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (editingId && !id.startsWith('card-')) cancelEdit();
+  el.classList.toggle('expanded');
+}
+
+/* Helpers UI */
+function makeIconButton(cls, onClick, svg = null) {
+  const b = document.createElement('button');
+  b.className = 'ico' + (cls ? ' ' + cls : '');
+  b.style.flexShrink = '0';
+  b.addEventListener('click', (e) => { e.stopPropagation(); onClick(); });
+  b.innerHTML = svg || '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"></circle></svg>';
+  return b;
+}
+
+/* RENDER MASTER */
+function render() {
+  const container = document.getElementById('vault');
+  const filtered = currentFilter === 'ALL' ? items : items.filter(i => (i.group || '').toUpperCase() === currentFilter);
+  container.innerHTML = '';
+  const frag = document.createDocumentFragment();
+
+  filtered.forEach(i => {
+    const card = document.createElement('div');
+    card.className = 'master-card';
+    card.id = `card-${i.id}`;
+
+    const inner = document.createElement('div'); inner.className = 'inner';
+
+    // Header
+    const header = document.createElement('div'); header.className = 'header';
+    const titleGroup = document.createElement('div'); titleGroup.className = 'title-group';
+    titleGroup.style.cursor = 'pointer';
+
+    const titleRow = document.createElement('div'); titleRow.style.display = 'flex'; titleRow.style.justifyContent = 'space-between'; titleRow.style.width = '100%';
+    const titleSpan = document.createElement('span'); titleSpan.className = 'card-title'; titleSpan.textContent = i.title || 'Sem Título';
+    const dateSpan = document.createElement('span'); dateSpan.className = 'card-meta'; dateSpan.textContent = (i.date || '').split(' ')[0] || '';
+    titleRow.appendChild(titleSpan); titleRow.appendChild(dateSpan);
+
+    const meta = document.createElement('span'); meta.className = 'card-meta';
+    if (i.group) {
+      const tag = document.createElement('span'); tag.className = 'tag-badge'; tag.textContent = i.group;
+      meta.appendChild(tag); meta.appendChild(document.createTextNode(' '));
+    }
+    meta.appendChild(document.createTextNode('ID:' + String(i.id).slice(-4)));
+
+    titleGroup.appendChild(titleRow); titleGroup.appendChild(meta);
+    titleGroup.addEventListener('click', () => card.classList.toggle('expanded'));
+    header.appendChild(titleGroup);
+
+    // Dock
+    const dock = document.createElement('div'); dock.className = 'dock';
+    const btnTts = makeIconButton('tts', () => speak(i.content), '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>');
+    const btnShare = makeIconButton('share', () => shareCard(i.id));
+    const btnRender = makeIconButton('', () => toggleRender(i.id));
+    const btnEdit = makeIconButton('', () => startEdit(i.id));
+    const btnDel = makeIconButton('del', () => deleteCard(i.id));
+    dock.appendChild(btnTts); dock.appendChild(btnShare); dock.appendChild(btnRender); dock.appendChild(btnEdit); dock.appendChild(btnDel);
+    header.appendChild(dock);
+    inner.appendChild(header);
+
+    // Content
+    const contentBox = document.createElement('div'); contentBox.className = 'content-box'; contentBox.id = `box-${i.id}`;
+    const txt = document.createElement('textarea'); txt.className = 'code-area'; txt.readOnly = true; txt.id = `txt-${i.id}`; txt.style.border = 'none'; txt.style.padding = '0'; txt.style.background = 'transparent'; txt.value = i.content;
+    contentBox.appendChild(txt);
+
+    const frame = document.createElement('div'); frame.id = `frame-container-${i.id}`; frame.style.display = 'none'; contentBox.appendChild(frame);
+
+    const preview = document.createElement('div'); preview.className = 'preview'; preview.style.marginTop = '8px'; preview.style.color = '#cbd5e1'; preview.style.fontSize = '13px';
+
+    // Preview generation
+    try {
+      const parsed = parseContent(i.content);
+      if (parsed.node) preview.appendChild(parsed.node.cloneNode(true));
+    } catch (e) {
+      const p = document.createElement('pre'); p.textContent = i.content; preview.appendChild(p);
+    }
+
+    contentBox.appendChild(preview);
+    inner.appendChild(contentBox);
+    card.appendChild(inner);
+    frag.appendChild(card);
+
+    if (editingId === i.id) setTimeout(() => openEditUI(i), 0);
+  });
+
+  container.appendChild(frag);
+
+  // Apply Highlight.js to all new code blocks
+  if (window.hljs) {
+    document.querySelectorAll('#vault pre code').forEach((block) => {
+      try { hljs.highlightElement(block); } catch(e) {}
+    });
+  }
+}
+
+/* WARFRAME RENDER (Allow-Same-Origin ON) */
+function toggleRender(id) {
+  const txt = document.getElementById(`txt-${id}`);
+  const frameBox = document.getElementById(`frame-container-${id}`);
+  const item = items.find(i => i.id === id);
+  if (!item || !frameBox) return;
+
+  if (frameBox.style.display === 'none' || frameBox.style.display === '') {
+    txt.style.display = 'none';
+    frameBox.style.display = 'block';
+
+    const parsed = parseContent(item.content);
+    if (parsed.type === 'html' || parsed.type === 'markdown') {
+      const iframe = document.createElement('iframe');
+      iframe.className = 'warframe-view';
+      // [PERIGOSO] allow-same-origin ativado conforme solicitado para scripts locais
+      iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups'); 
+      const srcdoc = parsed.type === 'html' ? (parsed.raw || nodeToHTML(parsed.node)) : nodeToHTML(parsed.node);
+      iframe.srcdoc = srcdoc;
+      frameBox.innerHTML = '';
+      frameBox.appendChild(iframe);
+    } else {
+      // JSON / Code View no modo Render
+      const pre = document.createElement('pre');
+      const code = document.createElement('code');
+      // Tentar detectar lang
+      if(parsed.type === 'json') code.className = 'language-json';
+      code.textContent = item.content;
+      pre.appendChild(code);
+      frameBox.innerHTML = '';
+      frameBox.appendChild(pre);
+      if (window.hljs) hljs.highlightElement(code);
+    }
+  } else {
+    txt.style.display = 'block';
+    frameBox.style.display = 'none';
+    frameBox.innerHTML = '';
+  }
+}
+
+/* Editor Logic */
+function openEditUI(item) {
+  const card = document.getElementById(`card-${item.id}`);
+  if (!card) return;
+  card.classList.add('expanded');
+  const inner = card.querySelector('.inner');
+  inner.innerHTML = '';
+
+  const header = document.createElement('div'); header.className = 'header';
+  const titleInput = document.createElement('input'); titleInput.value = item.title || ''; titleInput.id = `edit-title-${item.id}`; titleInput.style.cssText = 'height:34px; min-height:auto; padding:5px 10px; width: 60%; background:rgba(255,255,255,0.1); border:1px solid #444; color:white; border-radius:8px;';
+  const groupInput = document.createElement('input'); groupInput.value = item.group || ''; groupInput.id = `edit-group-${item.id}`; groupInput.style.cssText = 'height:34px; min-height:auto; padding:5px 10px; width: 20%; margin-left:5px; background:rgba(255,255,255,0.1); border:1px solid #444; color:white; border-radius:8px;';
+  
+  const dock = document.createElement('div'); dock.className = 'dock'; dock.style.marginLeft = 'auto';
+  const saveBtn = document.createElement('button'); saveBtn.className = 'ico flash'; saveBtn.textContent = '✓'; saveBtn.addEventListener('click', () => saveEdit(item.id));
+  dock.appendChild(saveBtn);
+
+  header.appendChild(titleInput); header.appendChild(groupInput); header.appendChild(dock);
+  inner.appendChild(header);
+
+  const contentBox = document.createElement('div'); contentBox.className = 'content-box'; contentBox.style.opacity = '1'; contentBox.style.maxHeight = 'none';
+  const ta = document.createElement('textarea'); ta.id = `edit-content-${item.id}`; ta.className = 'code-area'; ta.rows = 8; ta.value = item.content;
+  contentBox.appendChild(ta);
+  inner.appendChild(contentBox);
+}
+
+function startEdit(id) { editingId = id; render(); const c = document.getElementById(`card-${id}`); if (c) c.classList.add('expanded'); }
+function cancelEdit() { editingId = null; render(); }
+function saveEdit(id) {
+  const item = items.find(i => i.id === id);
+  if (!item) return;
+  const t = document.getElementById(`edit-title-${id}`).value;
+  const g = document.getElementById(`edit-group-${id}`).value.toUpperCase();
+  const c = document.getElementById(`edit-content-${id}`).value;
+  item.title = t; item.group = g; item.content = c;
+  item.date = new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR').slice(0,5);
+  editingId = null;
+  save();
+}
+
+function createCard(content, group = "") {
+  const title = (content || '').trim().split('\n')[0] || "Sem Título";
+  const item = { id: Date.now() + Math.floor(Math.random()*9999), title: title.substring(0,35).replace(/[#<*]/g,'').trim(), content, group: (group||'').toUpperCase(), date: new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR').slice(0,5) };
+  items.unshift(item);
+  save();
+}
+
+/* Header Actions */
+function saveManual() {
+  const text = document.getElementById('mainInput').value;
+  const group = document.getElementById('mainGroup').value;
+  if (text) { createCard(text, group); document.getElementById('mainInput').value = ''; toggle('main'); }
+}
+async function magicPaste() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text) return alert("Clipboard Vazio");
+    createCard(text, "CLIPBOARD");
+  } catch (e) { alert("Permissão de colar negada"); }
+}
+async function pasteToInput() {
+  try {
+    const text = await navigator.clipboard.readText();
+    const el = document.getElementById('mainInput');
+    if (el) el.value += text;
+  } catch (e) { alert("Permissão negada"); }
+}
+function injectExternal() {
+  const val = document.getElementById('mainInput').value;
+  const title = val.split('\n')[0].substring(0,20) || "External";
+  const card = document.createElement('div');
+  card.className = 'master-card ext-card-wrap';
+  card.innerHTML = `<div class="inner"><div class="header"><span class="card-title" style="color:var(--neon-b)">🚀 ${escapeAttr(title)}</span><div class="dock"><button class="ico del" onclick="this.closest('.ext-card-wrap').remove()">×</button></div></div><div style="margin-top:10px; color:#ccc; font-size:13px; white-space:pre-wrap;">${escapeAttr(val)}</div></div>`;
+  document.getElementById('ext-layer').appendChild(card);
+  document.getElementById('mainInput').value = '';
+}
+function importBackup(ev) {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) { alert("Inválido."); return; }
+      let count = 0; data.forEach(c => { if (c.content) { c.id = Date.now() + Math.floor(Math.random()*9999); items.unshift(c); count++; }});
+      save(); alert(count + " importados.");
+    } catch (err) { alert("Erro JSON."); }
+  };
+  reader.readAsText(file);
+}
+
+/* Share / TTS / Del */
+async function shareCard(id) {
+  const item = items.find(i => i.id === id);
+  if (navigator.share) try { await navigator.share({ title: item.title, text: item.content }); } catch(e){}
+  else { navigator.clipboard.writeText(item.content); alert("Copiado."); }
+}
+function speak(text) {
+  if (!text) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "pt-BR"; u.rate = 1.1;
+  window.speechSynthesis.speak(u);
+}
+function deleteCard(id) { if (confirm('Deletar?')) { items = items.filter(i => i.id !== id); save(); } }
+function filterVault(filter) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+  const btn = Array.from(document.querySelectorAll('.filter-pill')).find(n => n.textContent.trim().toUpperCase() === filter);
+  if (btn) btn.classList.add('active');
+  render();
+}
+
+function save() { localStorage.setItem('vault_v9', JSON.stringify(items)); render(); }
+
+/* Start */
+render();
+</script>
+</body>
+</html>
