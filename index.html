@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>WarpVault v9.2 · KOBLLUX</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.web.json"/>
+  <link rel="icon" href="./icone-192.png" type="image/png"/>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js")
+      .then(() => console.log("%c[PWA] Service Worker ativo.","color:lime"))
+      .catch(err => console.log("SW falhou:", err));
+  });
+}
+</script>
+  <!-- Fonte & base -->
+  <style>
+    :root {
+      --bg: rgba(0,0,0,0.01);
+      --glass: rgba(255,255,255,0.08);
+      --blur: blur(10px);
+      --radius: 14px;
+      --txt: #e9e9e9;
+    }
+
+    body {
+      background: var(--bg);
+      font-family: system-ui, sans-serif;
+      color: var(--txt);
+      margin: 0;
+      padding: 0;
+    }
+
+    header {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      padding: 10px;
+      backdrop-filter: var(--blur);
+      background: var(--glass);
+    }
+
+    header svg {
+      height: 32px;
+      width: 32px;
+      cursor: pointer;
+      transition: .2s;
+    }
+
+    header svg:hover {
+      transform: scale(1.15);
+    }
+
+    .container {
+      padding: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+
+    .card {
+      width: 260px;
+      min-height: 200px;
+      background: var(--glass);
+      backdrop-filter: var(--blur);
+      border-radius: var(--radius);
+      padding: 12px;
+      border: 1px solid rgba(255,255,255,0.15);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card textarea {
+      flex: 1;
+      background: transparent;
+      border: none;
+      resize: none;
+      color: var(--txt);
+      font-size: 15px;
+    }
+
+    .actions {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+
+    .actions button {
+      border: none;
+      background: rgba(255,255,255,0.08);
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      color: var(--txt);
+      font-size: 12px;
+    }
+
+    /* Presets */
+    .card[data-style="blue"] {
+      border-color: #4ea8ff;
+    }
+    .card[data-style="red"] {
+      border-color: #ff6a6a;
+    }
+    .card[data-style="green"] {
+      border-color: #6affb7;
+    }
+    .card[data-style="gold"] {
+      border-color: #ffc94e;
+    }
+
+    /* DUO/TRINITY layers */
+    .uno {}
+    .duo { outline: 1px dashed rgba(255,255,255,0.2); }
+    .trinity { box-shadow: 0 0 12px rgba(255,255,255,0.25); }
+
+    /* Log container */
+    .log {
+      font-size: 11px;
+      opacity: .7;
+      margin-top: 6px;
+      line-height: 1.2;
+      max-height: 60px;
+      overflow-y: auto;
+      background: rgba(255,255,255,0.05);
+      padding: 4px;
+      border-radius: 4px;
+    }
+
+    #pasteGlobal {
+      position: fixed;
+      bottom: 14px;
+      right: 14px;
+      background: rgba(255,255,255,0.15);
+      padding: 12px 18px;
+      border-radius: 14px;
+      cursor: pointer;
+      border: none;
+      backdrop-filter: blur(8px);
+      color: var(--txt);
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <!-- SVG icons restored aesthetic -->
+  <svg viewBox="0 0 24 24" id="addCard">
+    <path fill="currentColor" d="M19 11H13V5h-2v6H5v2h6v6h2v-6h6z"/>
+  </svg>
+
+  <svg viewBox="0 0 24 24" id="saveAll">
+    <path fill="currentColor" d="M17 3H7a2 2 0 0 0-2 2v14l7-3l7 3V5a2 2 0 0 0-2-2z"/>
+  </svg>
+
+  <svg viewBox="0 0 24 24" id="loadAll">
+    <path fill="currentColor" d="M12 3l8 8h-6v8H10v-8H4z"/>
+  </svg>
+
+  <svg viewBox="0 0 24 24" id="clearAll">
+    <path fill="currentColor" d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6z"/>
+  </svg>
+</header>
+
+<div class="container" id="cards"></div>
+
+<button id="pasteGlobal">Colar texto</button>
+
+<script>
+/* STATE */
+let storageKey = "warpVault-v9";
+let cards = [];
+
+function createCard(style="blue", layer="uno") {
+  const id = Date.now();
+  const card = {
+    id,
+    style,
+    layer,
+    text: "",
+    log: []
+  };
+  cards.push(card);
+  renderCards();
+}
+
+function renderCards() {
+  const container = document.getElementById("cards");
+  container.innerHTML = "";
+  cards.forEach(card => {
+    const div = document.createElement("div");
+    div.className = `card ${card.layer}`;
+    div.dataset.style = card.style;
+    div.innerHTML = `
+      <textarea>${card.text}</textarea>
+      <div class="actions">
+        <button data-act="save" data-id="${card.id}">Salvar</button>
+        <button data-act="edit" data-id="${card.id}">Editar</button>
+        <button data-act="dup" data-id="${card.id}">Duplicar</button>
+      </div>
+      <div class="log">
+        ${card.log.map(l => `<div>${l}</div>`).join("")}
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+/* SAVE / LOAD */
+function save() {
+  localStorage.setItem(storageKey, JSON.stringify(cards));
+}
+
+function load() {
+  const data = localStorage.getItem(storageKey);
+  if(!data) return;
+  cards = JSON.parse(data);
+  renderCards();
+}
+
+function clear() {
+  localStorage.removeItem(storageKey);
+  cards = [];
+  renderCards();
+}
+
+/* LOGGER */
+function logCard(id, msg) {
+  const card = cards.find(c=>c.id==id);
+  if(!card) return;
+  card.log.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
+}
+
+/* EVENTS */
+document.addEventListener("click", e=>{
+  if(e.target.id==="addCard") createCard();
+  if(e.target.id==="saveAll") save();
+  if(e.target.id==="loadAll") load();
+  if(e.target.id==="clearAll") clear();
+
+  if(e.target.dataset.act==="save") {
+    const id = parseInt(e.target.dataset.id);
+    const card = cards.find(c=>c.id==id);
+    card.text = e.target.closest(".card").querySelector("textarea").value;
+    logCard(id, "Salvo");
+    save();
+    renderCards();
+  }
+
+  if(e.target.dataset.act==="edit") {
+    const id = parseInt(e.target.dataset.id);
+    logCard(id, "Edição iniciada");
+    renderCards();
+  }
+
+  if(e.target.dataset.act==="dup") {
+    const id = parseInt(e.target.dataset.id);
+    const card = cards.find(c=>c.id==id);
+    createCard(card.style, card.layer);
+  }
+});
+
+/* GLOBAL PASTE */
+document.getElementById("pasteGlobal").onclick = async ()=>{
+  const text = await navigator.clipboard.readText();
+  createCard("gold", "trinity");
+  cards[cards.length-1].text = text;
+  renderCards();
+};
+
+load();
+</script>
+
+</body>
+</html>
