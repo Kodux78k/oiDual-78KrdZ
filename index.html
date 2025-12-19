@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Dual.Vault v9 - Warframe</title>
+<title>Dual.Vault v9 - 78KrdZ</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="manifest" href="./manifest.webmanifest">
 <meta name="theme-color" content="#050505">
@@ -163,6 +163,10 @@ body {
                 <button class="ico" style="flex:1; border-radius: 8px; width:auto; font-size: 11px; font-weight:700; gap:6px; color: var(--neon-b); border-color: rgba(59,130,246,0.3);" onclick="injectExternal()">
                     INJETAR FORA
                 </button>
+              <input type="file" id="importFile" accept=".json,.html,.md,.patch,.rds, .css, .js, .txt" style="display:none" onchange="importBackup(event)">
+<button class="ico" style="flex:1; border-radius: 8px; font-size: 11px; font-weight:700;" onclick="document.getElementById('importFile').click()">
+    IMPORTAR
+</button>
             </div>
         </div>
     </div>
@@ -369,7 +373,40 @@ function injectExternal() {
     document.getElementById('ext-layer').appendChild(d);
     document.getElementById('mainInput').value = '';
 }
+function importBackup(ev) {
+    const file = ev.target.files[0];
+    if (!file) return;
 
+    const reader = new FileReader();
+    reader.onload = e => {
+        try {
+            const data = JSON.parse(e.target.result);
+
+            if (!Array.isArray(data)) {
+                alert("Arquivo inválido: não é uma lista de cards.");
+                return;
+            }
+
+            let count = 0;
+
+            data.forEach(card => {
+                if (card.content) {
+                    // garantir id único
+                    card.id = Date.now() + Math.floor(Math.random() * 9999);
+                    items.unshift(card);
+                    count++;
+                }
+            });
+
+            save();
+            alert(count + " cards importados com sucesso!");
+        } catch (err) {
+            alert("Erro ao ler arquivo JSON.");
+        }
+    };
+
+    reader.readAsText(file);
+}
 // --- CRUD ---
 function startEdit(id) { editingId = id; render(); document.getElementById(`card-${id}`).classList.add('expanded'); }
 function cancelEdit() { editingId = null; render(); }
