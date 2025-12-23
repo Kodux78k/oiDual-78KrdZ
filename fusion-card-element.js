@@ -2,7 +2,6 @@
 const template = document.createElement('template');
 template.innerHTML = `
   <style>
-    /* (seu CSS inteiro aqui — mantive exatamente o original) */
     :host{all:initial;display:block;font-family:Montserrat,system-ui,Arial,sans-serif;color:#fff}
     :host *{box-sizing:border-box}
     :root{--bg-deep:#030406;--glass-surface:rgba(18,18,22,0.65);--glass-border:rgba(255,255,255,0.06);--neon-cyan:#00f2ff;--neon-purple:#bd00ff;--neon-orange:#ff9a3c;--font-ui:'Montserrat',sans-serif;--font-code:monospace;--ease-overshoot:cubic-bezier(0.34,1.3,0.64,1);--ease-smooth:cubic-bezier(0.23,1,0.32,1)}
@@ -172,10 +171,7 @@ Ativar: (Convidado).Dual Infodose
                 <div class="bar-track"><div class="bar-fill" id="cycleFill"></div></div>
               </div>
 
-              <!-- SLOT ADICIONADO AQUI: consumers can pass any DOM node with slot="html-module" -->
-              <div class="html-module-slot" id="htmlSlot">
-                <slot name="html-module">// MÓDULO EXTERNO — PRONTO PARA INJEÇÃO HTML</slot>
-              </div>
+              <div class="html-module-slot" id="htmlSlot">// MÓDULO EXTERNO — PRONTO PARA INJEÇÃO HTML</div>
             </div>
           </div>
         </div>
@@ -185,8 +181,6 @@ Ativar: (Convidado).Dual Infodose
     <div id="toasterWrap"></div>
   </div>
 `;
-
-/* --- classe FusionCard (mantive seu código + adicionei métodos para manipular slot programaticamente) --- */
 
 class FusionCard extends HTMLElement {
   constructor(){
@@ -220,7 +214,6 @@ class FusionCard extends HTMLElement {
     this.cycleFill = this.$('#cycleFill');
     this.cyclePercent = this.$('#cyclePercent');
     this.htmlSlot = this.$('#htmlSlot');
-    this.htmlModuleSlotElement = this._shadow.querySelector('slot[name="html-module"]'); // reference to the slot
     this.toasterWrap = this._shadow.getElementById('toasterWrap') || this._shadow.querySelector('#toasterWrap');
     // internal
     this._interval = null;
@@ -282,14 +275,6 @@ class FusionCard extends HTMLElement {
 
     // populate activation block
     this._updateActivationBlock(saved || 'Convidado');
-
-    // Listen to slotchange to react when host injects content declaratively
-    if(this.htmlModuleSlotElement){
-      this.htmlModuleSlotElement.addEventListener('slotchange', (e) => {
-        // dispatch an event so consumer can react if needed
-        this.dispatchEvent(new CustomEvent('module:slotchange', { detail: { assignedNodes: this.htmlModuleSlotElement.assignedNodes() } }));
-      });
-    }
   }
 
   disconnectedCallback(){
@@ -309,53 +294,6 @@ class FusionCard extends HTMLElement {
   open(){ if(this.card.classList.contains('closed')) this._toggleCard(); }
   close(){ if(!this.card.classList.contains('closed')) this._toggleCard(); }
   toggle(){ this._toggleCard(); }
-
-  // ---- slot helper APIs ----
-  /**
-   * Programmatically inject HTML into the html-module slot.
-   * NOTE: this uses innerHTML on a created light-DOM wrapper. If content is untrusted,
-   * sanitize it (e.g. DOMPurify) before passing.
-   * Returns the created wrapper node.
-   */
-  setModuleHTML(html){
-    const wrapper = document.createElement('div');
-    wrapper.setAttribute('slot','html-module');
-    wrapper.className = 'injected-module';
-    wrapper.innerHTML = html; // ⚠️ consumer must sanitize if content is untrusted
-    this.appendChild(wrapper); // append to light DOM of <fusion-card> so slot can pick it up
-    // notify
-    this.dispatchEvent(new CustomEvent('module:inserted', { detail: { node: wrapper } }));
-    return wrapper;
-  }
-
-  /**
-   * Remove all programmatically injected modules created with setModuleHTML.
-   * Keeps declarative slotted nodes (nodes added directly in host markup) intact.
-   */
-  clearInjectedModules(){
-    const children = Array.from(this.children);
-    const removed = [];
-    for(const c of children){
-      if(c && c.getAttribute && c.getAttribute('slot') === 'html-module' && c.classList.contains('injected-module')){
-        removed.push(c);
-        c.remove();
-      }
-    }
-    this.dispatchEvent(new CustomEvent('module:cleared', { detail: { removed } }));
-    return removed;
-  }
-
-  /**
-   * Remove a specific node from slot (if it's a child of the host).
-   */
-  removeModuleNode(node){
-    if(node && node.parentElement === this){
-      node.remove();
-      this.dispatchEvent(new CustomEvent('module:removed', { detail: { node } }));
-      return true;
-    }
-    return false;
-  }
 
   destroy(){
     if(!this._mounted) return;
@@ -602,7 +540,8 @@ class FusionCard extends HTMLElement {
 // (we need those helpers available; define them now)
 (function attachHelpers() {
   const proto = FusionCard.prototype;
-  // nothing to attach here since methods are declared on the class
+  // copy internal functions from above (we used forward declarations earlier)
+  // (these functions we referenced in constructor are already defined on the prototype via closures inside the class body)
 })();
 
 customElements.define('fusion-card', FusionCard);
