@@ -8,6 +8,7 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <meta name="theme-color" content="#050505">
 
+<!-- Service Worker original (mantive) -->
 <script>
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js")
@@ -17,11 +18,11 @@ if ("serviceWorker" in navigator) {
 </script>
 
 <link rel="apple-touch-icon" href="./icon-192.png">
-    
-   
-    
-    
-    <style>
+
+<!-- DOMPurify (recomendado para sanitização de HTML remoto) -->
+<script src="https://cdn.jsdelivr.net/npm/dompurify@2.4.0/dist/purify.min.js"></script>
+
+<style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap');
 
 :root {
@@ -123,6 +124,10 @@ body {
 }
 .filter-pill.active { background: var(--neon-p); color: white; border-color: var(--neon-p); }
 
+/* small helpers for fusion-card list */
+.fusion-list { display:flex; flex-direction:column; gap:10px; width:100%; max-width:460px; margin-top:8px; }
+.fusion-meta { font-size:12px; color:#94a3b8; margin-bottom:6px; }
+.selected-fusion { box-shadow:0 12px 36px rgba(0,0,0,0.6); border:1px solid rgba(0,240,255,0.06); }
 </style>
 </head>
 <body>
@@ -154,9 +159,12 @@ body {
         
         <div class="content-box">
             <div style="position: relative;">
-                <textarea id="mainInput" class="code-area" rows="4" placeholder="⍯…"></textarea>
-                <button onclick="pasteToInput()" style="position: absolute; bottom: 8px; right: 8px; background: var(--neon-p); color: white; border: none; padding: 4px 10px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: pointer;">
+                <textarea id="mainInput" class="code-area" rows="6" placeholder="Cole HTML, código ou URL aqui — depois clique em ╰↳KrdZ↴ para criar um Fusion Card com o módulo injetado"></textarea>
+                <button id="btnPasteToInput" onclick="pasteToInput()" style="position: absolute; bottom: 8px; right: 92px; background: var(--neon-p); color: white; border: none; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer;">
                   ⍯
+                </button>
+                <button id="btnInjectExternal" class="ico" title="Criar Fusion Card / injetar módulo" style="position: absolute; bottom: 6px; right: 8px; width:auto;padding:6px 10px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);">
+                  ╰↳KrdZ↴
                 </button>
             </div>
             
@@ -166,13 +174,11 @@ body {
                 <button class="ico" style="flex:1; border-radius: 8px; width:auto; font-size: 11px; font-weight:700; gap:6px;" onclick="saveManual()">
                    ☥سΣ9•
                 </button>
-                <button class="ico" style="flex:1; border-radius: 8px; width:auto; font-size: 11px; font-weight:700; gap:6px; color: var(--neon-b); border-color: rgba(59,130,246,0.3);" onclick="injectExternal()">
-                   ╰↳KrdZ↴
+
+                <input type="file" id="importFile" accept=".json,.html,.md,.patch,.rds, .css, .js, .txt" style="display:none" onchange="importBackup(event)">
+                <button class="ico" style="flex:1; border-radius: 8px; font-size: 11px; font-weight:700;" onclick="document.getElementById('importFile').click()">
+                   ￬⟐￬⧉￬
                 </button>
-              <input type="file" id="importFile" accept=".json,.html,.md,.patch,.rds, .css, .js, .txt" style="display:none" onchange="importBackup(event)">
-<button class="ico" style="flex:1; border-radius: 8px; font-size: 11px; font-weight:700;" onclick="document.getElementById('importFile').click()">
-   ￬⟐￬⧉￬
-</button>
             </div>
         </div>
     </div>
@@ -180,12 +186,49 @@ body {
 
 <div id="vault" style="width: 100%; max-width: 460px;"></div>
 
-<script>
+<!-- area onde listamos fusion-cards criados -->
+<div class="fusion-list" id="fusionList" aria-live="polite"></div>
+
+<script type="module">
+/*
+  Injector aplicado: cria Fusion Cards e injeta módulos via setModuleHTML.
+  - Requer ./fusion-card-element.js ao lado deste arquivo.
+  - Usa DOMPurify (CDN) para sanitização (já incluído no <head>).
+*/
+
+import './fusion-card-element.js';
+
 let items = JSON.parse(localStorage.getItem('vault_v9') || '[]');
 let currentFilter = 'ALL';
 let editingId = null;
+let selectedFusionCard = null; // referência ao fusion-card DOM
 
-// --- SISTEMA DE RENDERIZAÇÃO ---
+// helper sanitize: usa DOMPurify se disponível, senão fallback
+function sanitizeHTML(input){
+  if(!input) return '';
+  if(window.DOMPurify && typeof DOMPurify.sanitize === 'function'){
+    // política por defeito: mantém tags seguras
+    return DOMPurify.sanitize(input, {SAFE_FOR_TEMPLATES: true});
+  }
+  // fallback simples: remove <script>, <iframe>, event attributes
+  try {
+    const doc = new DOMParser().parseFromString(input, 'text/html');
+    doc.querySelectorAll('script,iframe,style,link').forEach(n => n.remove());
+    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_ELEMENT, null, false);
+    while(walker.nextNode()){
+      const el = walker.currentNode;
+      [...el.attributes].forEach(attr=>{
+        if(/^on/i.test(attr.name) || attr.name.toLowerCase() === 'srcdoc') el.removeAttribute(attr.name);
+      });
+    }
+    return doc.body.innerHTML;
+  } catch(e){
+    console.warn('sanitize fallback failed', e);
+    return '';
+  }
+}
+
+// ---------------- existing app logic (preserve) ---------------- //
 function render() {
     const v = document.getElementById('vault');
     const filtered = currentFilter === 'ALL' ? items : items.filter(i => (i.group || '').toUpperCase() === currentFilter);
@@ -193,37 +236,35 @@ function render() {
     v.innerHTML = filtered.map(i => {
         const isEditing = editingId === i.id;
         
-        // MODO EDIÇÃO
         if (isEditing) {
             return `
             <div class="master-card expanded" id="card-${i.id}">
                 <div class="inner">
                     <div class="header">
-                        <input id="edit-title-${i.id}" value="${i.title}" class="code-area" style="height:34px; min-height:auto; padding:5px 10px; width: 60%;">
-                        <input id="edit-group-${i.id}" value="${i.group||''}" class="code-area" style="height:34px; min-height:auto; padding:5px 10px; width: 20%; margin-left:5px;">
+                        <input id="edit-title-${i.id}" value="${escapeHtml(i.title)}" class="code-area" style="height:34px; min-height:auto; padding:5px 10px; width: 60%;">
+                        <input id="edit-group-${i.id}" value="${escapeHtml(i.group||'')}" class="code-area" style="height:34px; min-height:auto; padding:5px 10px; width: 20%; margin-left:5px;">
                         <div class="dock" style="margin-left: auto;">
                             <button class="ico flash" onclick="saveEdit(${i.id})">✓</button>
                         </div>
                     </div>
                     <div class="content-box" style="opacity:1; max-height:none;">
-                        <textarea id="edit-content-${i.id}" class="code-area" rows="8">${i.content}</textarea>
+                        <textarea id="edit-content-${i.id}" class="code-area" rows="8">${escapeHtml(i.content)}</textarea>
                     </div>
                 </div>
             </div>`;
         }
         
-        // MODO VISUALIZAÇÃO
         return `
         <div class="master-card" id="card-${i.id}">
             <div class="inner">
                 <div class="header">
                     <div class="title-group" onclick="toggle('card-${i.id}')">
                         <div style="display:flex; justify-content:space-between; width:100%;">
-                            <span class="card-title">${i.title}</span>
+                            <span class="card-title">${escapeHtml(i.title)}</span>
                             <span class="card-meta">${i.date.split(' ')[0]}</span>
                         </div>
                         <span class="card-meta">
-                            ${i.group ? `<span class="tag-badge">${i.group}</span>` : ''} 
+                            ${i.group ? `<span class="tag-badge">${escapeHtml(i.group)}</span>` : ''} 
                             ID:${i.id.toString().slice(-4)}
                         </span>
                     </div>
@@ -252,7 +293,7 @@ function render() {
                 </div>
                 
                 <div class="content-box" id="box-${i.id}">
-                    <textarea readonly class="code-area" id="txt-${i.id}" style="border:none; padding:0; background:transparent;">${i.content}</textarea>
+                    <textarea readonly class="code-area" id="txt-${i.id}" style="border:none; padding:0; background:transparent;">${escapeHtml(i.content)}</textarea>
                     <div id="frame-container-${i.id}" style="display:none;"></div>
                 </div>
             </div>
@@ -260,15 +301,16 @@ function render() {
     }).join('');
 }
 
-// --- FUNÇÕES DE LÓGICA ---
+// escape helper
+function escapeHtml(s){ return (s+'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'); }
 
-// 1. Alternar Card
+// existing app functions (unchanged)
 function toggle(id) {
-    if(editingId && editingId !== `card-${id}` && id !== 'main') cancelEdit();
-    document.getElementById(id).classList.toggle('expanded');
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.classList.toggle('expanded');
 }
 
-// 2. Criação
 function saveManual() {
     const text = document.getElementById('mainInput').value;
     const group = document.getElementById('mainGroup').value;
@@ -305,7 +347,6 @@ function createCard(content, group = "") {
     save();
 }
 
-// 3. Compartilhar (WhatsApp etc)
 async function shareCard(id) {
     const item = items.find(i => i.id === id);
     if (navigator.share) {
@@ -316,13 +357,11 @@ async function shareCard(id) {
             });
         } catch (err) { console.log('Share cancelado'); }
     } else {
-        // Fallback: Copiar
         navigator.clipboard.writeText(item.content);
         alert("Copiado para Clipboard (Share não suportado)");
     }
 }
 
-// 4. TTS (Fala)
 function speakCard(id) {
     const item = items.find(i => i.id === id);
     speak(item.content);
@@ -335,24 +374,17 @@ function speak(txt) {
     window.speechSynthesis.speak(u);
 }
 
-// 5. Warframe / Render
 function toggleRender(id) {
     const txt = document.getElementById(`txt-${id}`);
     const frameBox = document.getElementById(`frame-container-${id}`);
     const item = items.find(i => i.id === id);
 
-    // Se frameBox estiver vazio ou escondido, abrir preview
     if (frameBox.style.display === 'none' || frameBox.innerHTML === '') {
-        // 1. Oculta o código fonte
         txt.style.display = 'none';
         frameBox.style.display = 'block';
-        frameBox.innerHTML = ''; // garante limpeza antes de inserir
-
-        // 2. Cria a barra de ferramentas do render (Expandir/Fechar)
+        frameBox.innerHTML = '';
         const toolbar = document.createElement('div');
         toolbar.style.cssText = "display:flex; justify-content:flex-end; gap:8px; margin-bottom:6px;";
-
-        // Botão Expandir (Modo Cinema)
         const btnExpand = document.createElement('button');
         btnExpand.innerHTML = '⛶ Expandir';
         btnExpand.className = 'tag-badge';
@@ -361,22 +393,16 @@ function toggleRender(id) {
             e.stopPropagation();
             const fs = document.createElement('div');
             fs.style.cssText = "position:fixed; inset:0; z-index:9999; background:#000; padding:20px; display:flex; flex-direction:column;";
-            
             const closeFs = document.createElement('button');
             closeFs.innerText = "❌ Fechar Modo Cinema";
             closeFs.style.cssText = "align-self:flex-end; padding:8px 16px; background:#ef4444; color:white; border:none; border-radius:6px; margin-bottom:10px; cursor:pointer; font-weight:bold;";
             closeFs.onclick = () => fs.remove();
-
             const bigFrame = document.createElement('iframe');
             bigFrame.style.cssText = "width:100%; height:100%; border:none; background:#fff; border-radius:8px;";
-            // permitir scripts no fullscreen
             bigFrame.setAttribute('sandbox', 'allow-scripts allow-modals allow-forms allow-same-origin');
-
             fs.appendChild(closeFs);
             fs.appendChild(bigFrame);
             document.body.appendChild(fs);
-
-            // Injeta no Fullscreen (escreve direto para evitar problemas de aspas)
             const doc = bigFrame.contentWindow.document;
             doc.open();
             doc.write(item.content);
@@ -384,72 +410,172 @@ function toggleRender(id) {
         };
 
         toolbar.appendChild(btnExpand);
-
-        // Botão Fechar (apenas dentro da toolbar, para voltar ao modo código)
         const btnClose = document.createElement('button');
         btnClose.innerText = '✖ Fechar';
         btnClose.className = 'tag-badge';
         btnClose.style.cursor = 'pointer';
         btnClose.onclick = function(e) {
             e.stopPropagation();
-            // Voltar p/ Código
             txt.style.display = 'block';
             frameBox.style.display = 'none';
             frameBox.innerHTML = '';
         };
         toolbar.appendChild(btnClose);
-
         frameBox.appendChild(toolbar);
-
-        // 3. Cria o Iframe local (Preview)
         const iframe = document.createElement('iframe');
         iframe.className = 'warframe-view';
-        // Aumenta um pouco a altura padrão para visualização
         iframe.style.height = "300px";
-        // permitir scripts no preview
         iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
         frameBox.appendChild(iframe);
-
-        // 4. A MÁGICA: Escreve o conteúdo direto no documento do iframe
-        // Isso evita erros de aspas no srcdoc
         const doc = iframe.contentWindow.document;
         doc.open();
         doc.write(item.content);
         doc.close();
 
     } else {
-        // Voltar para modo Código
         txt.style.display = 'block';
         frameBox.style.display = 'none';
-        frameBox.innerHTML = ''; // Limpa para economizar memória
+        frameBox.innerHTML = '';
     }
 }
 
-// 6. Inject Outside (Visual Card Style)
-function injectExternal() {
-    const val = document.getElementById('mainInput').value;
-    const title = val.split('\n')[0].substring(0,20) || "External";
-    
-    // Cria a estrutura visual do card
-    const cardHTML = `
-        <div class="master-card ext-card-wrap">
-            <div class="inner">
-                <div class="header">
-                     <span class="card-title" style="color:var(--neon-b)">🚀 ${title}</span>
-                     <div class="dock"><button class="ico del" onclick="this.closest('.ext-card-wrap').remove()">×</button></div>
-                </div>
-                <div style="margin-top:10px; color:#ccc; font-size:13px;">
-                    ${val} 
-                </div>
-            </div>
+// ---------------- NEW: Fusion Card injector functions ---------------- //
+
+// create fusion-card element, append to fusionList and vault; return element
+function createFusionCard({ title = 'Fusion Card', username = '', moduleHTML = null } = {}) {
+  const fusionList = document.getElementById('fusionList');
+  const vault = document.getElementById('vault');
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'ext-card-wrap';
+  // create fusion-card element (custom element handled by fusion-card-element.js)
+  const fc = document.createElement('fusion-card');
+  // set optional user name
+  if(username && typeof fc.setUserName === 'function') fc.setUserName(username);
+  // decorate wrapper visually: header above the fusion-card
+  const meta = document.createElement('div');
+  meta.className = 'fusion-meta';
+  meta.innerHTML = `<span style="font-weight:700">${escapeHtml(title)}</span> &nbsp; <small style="color:#94a3b8">· fusion</small>`;
+  // click to select
+  wrapper.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    // toggle selection
+    document.querySelectorAll('.ext-card-wrap').forEach(n => n.classList.remove('selected-fusion'));
+    wrapper.classList.add('selected-fusion');
+    selectedFusionCard = fc;
+  });
+
+  wrapper.appendChild(meta);
+  wrapper.appendChild(fc);
+  fusionList.prepend(wrapper);
+  // also append a light visual duplicate to vault area (keeps old UI)
+  const d = document.createElement('div');
+  d.innerHTML = `
+    <div class="master-card ext-card-wrap">
+      <div class="inner">
+        <div class="header">
+             <span class="card-title" style="color:var(--neon-b)">🚀 ${escapeHtml(title)}</span>
+             <div class="dock"><button class="ico del" onclick="this.closest('.ext-card-wrap').remove()">×</button></div>
         </div>
-    `;
-    
-    const d = document.createElement('div');
-    d.innerHTML = cardHTML;
-    document.getElementById('ext-layer').appendChild(d);
-    document.getElementById('mainInput').value = '';
+        <div style="margin-top:10px; color:#ccc; font-size:13px;">
+            ${escapeHtml(title)} 
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('ext-layer').appendChild(d);
+
+  // if moduleHTML provided, inject sanitized version
+  if(moduleHTML){
+    try {
+      const safe = typeof moduleHTML === 'string' ? sanitizeHTML(moduleHTML) : '';
+      if(fc.setModuleHTML) fc.setModuleHTML(safe || `<pre style="white-space:pre-wrap;color:#fff;background:transparent;border:none">${escapeHtml(moduleHTML)}</pre>`);
+    } catch(e){
+      console.warn('erro ao injetar moduleHTML', e);
+    }
+  }
+
+  // return the fusion-card element
+  return fc;
 }
+
+// main injectExternal replacement
+async function injectExternal() {
+  const raw = document.getElementById('mainInput').value.trim();
+  const group = document.getElementById('mainGroup').value || '';
+  if(!raw) return alert('Cole HTML, URL ou texto no campo principal.');
+
+  // if raw looks like a URL, try fetch
+  const isUrl = /^(https?:\/\/|\/)/i.test(raw);
+  if(isUrl){
+    try {
+      const resp = await fetch(raw, {cache:'no-store'});
+      if(!resp.ok) throw new Error(resp.status + ' ' + resp.statusText);
+      let text = await resp.text();
+      text = sanitizeHTML(text);
+      // create or use the selected fusion card and inject
+      const target = selectedFusionCard || createFusionCard({ title: extractTitleFromContent(text) || 'Remote Module', username: '', moduleHTML: text });
+      if(target && target.setModuleHTML) {
+        target.setModuleHTML(text);
+        toast('Módulo remoto injetado no Fusion Card');
+      }
+      document.getElementById('mainInput').value = '';
+      return;
+    } catch(err){
+      console.error('fetch error', err);
+      return alert('Erro ao buscar URL. Verifique a origem ou use HTML direto.');
+    }
+  }
+
+  // not a URL => treat as HTML snippet or plain text
+  const looksLikeHtml = /^\s*</.test(raw);
+  const safe = looksLikeHtml ? sanitizeHTML(raw) : `<pre style="white-space:pre-wrap; color:#dbeafe; font-family:monospace; background:transparent; border:none;">${escapeHtml(raw)}</pre>`;
+
+  // if user selected an existing fusion card, inject there; else create new fusion card
+  const targetCard = selectedFusionCard || createFusionCard({ title: extractTitleFromContent(raw) || 'Fusion Snippet', username: '', moduleHTML: safe });
+  if(targetCard && targetCard.setModuleHTML){
+    targetCard.setModuleHTML(safe);
+    toast('Módulo injetado no Fusion Card');
+  } else {
+    toast('Fusion Card criado e módulo injetado');
+  }
+  document.getElementById('mainInput').value = '';
+}
+
+// small util: choose a sensible title from content
+function extractTitleFromContent(text){
+  if(!text) return '';
+  const m = text.trim().split('\n').find(l => l.trim().length > 0);
+  if(!m) return '';
+  return m.replace(/<[^>]*>/g,'').slice(0, 28);
+}
+
+// tiny toast
+function toast(msg){
+  const t = document.createElement('div');
+  t.textContent = msg;
+  t.style.position='fixed'; t.style.right='12px'; t.style.bottom='12px';
+  t.style.background='rgba(0,0,0,0.8)'; t.style.color='#fff'; t.style.padding='8px 12px'; t.style.borderRadius='8px';
+  t.style.fontFamily='monospace'; t.style.zIndex=9999; t.style.opacity='0'; t.style.transform='translateY(8px)';
+  document.body.appendChild(t);
+  requestAnimationFrame(()=> { t.style.transition='all .26s'; t.style.opacity='1'; t.style.transform='translateY(0)'; });
+  setTimeout(()=> { t.style.opacity='0'; t.style.transform='translateY(8px)'; setTimeout(()=>t.remove(),280); }, 2000);
+}
+
+// expose API to window for automation
+window.FusionInjector = {
+  createFusionCard,
+  injectToSelected: (html, sanitize=true) => {
+    const safe = sanitize ? sanitizeHTML(html) : html;
+    const target = selectedFusionCard || createFusionCard({ title: extractTitleFromContent(html) || 'Programmatic', moduleHTML: safe });
+    if(target.setModuleHTML) target.setModuleHTML(safe);
+    return target;
+  },
+  sanitizeHTML,
+  selectLastCreated: () => { const last = document.querySelector('.ext-card-wrap fusion-card'); if(last){ last.closest('.ext-card-wrap').classList.add('selected-fusion'); selectedFusionCard = last; } return selectedFusionCard; }
+};
+
+// ---------------- existing CRUD + helpers ---------------- //
 function importBackup(ev) {
     const file = ev.target.files[0];
     if (!file) return;
@@ -468,7 +594,6 @@ function importBackup(ev) {
 
             data.forEach(card => {
                 if (card.content) {
-                    // garantir id único
                     card.id = Date.now() + Math.floor(Math.random() * 9999);
                     items.unshift(card);
                     count++;
@@ -484,7 +609,7 @@ function importBackup(ev) {
 
     reader.readAsText(file);
 }
-// --- CRUD ---
+
 function startEdit(id) { editingId = id; render(); document.getElementById(`card-${id}`).classList.add('expanded'); }
 function cancelEdit() { editingId = null; render(); }
 
@@ -508,7 +633,8 @@ function deleteCard(id) {
 function filterVault(filter) {
     currentFilter = filter;
     document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
-    event.target.classList.add('active');
+    // event may not exist if called programmatically - guard
+    try { event.target.classList.add('active'); } catch(e){}
     render();
 }
 
@@ -517,8 +643,12 @@ function save() {
     render();
 }
 
-// Init
+// initial render
 render();
+
+// bind new inject button
+document.getElementById('btnInjectExternal').addEventListener('click', (e)=>{ e.preventDefault(); injectExternal(); });
+
 </script>
 </body>
 </html>
