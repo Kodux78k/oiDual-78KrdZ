@@ -18,9 +18,7 @@ if ("serviceWorker" in navigator) {
 
 <link rel="apple-touch-icon" href="./icon-192.png">
     
-   <script type="module">
-    import { mountFusionCard, unmountFusionCard } from './fusion-card.mjs';</script>
- 
+   
     
     
     <style>
@@ -97,9 +95,15 @@ body {
     font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.5;
     outline: none; resize: vertical; min-height: 100px;
 }
+/* Atualizado conforme patch: mais altura e fundo branco para compatibilidade com scripts */
 .warframe-view {
-    width: 100%; height: 200px; border: none; background: white;
-    border-radius: 12px; margin-top: 8px;
+    width: 100%; 
+    height: 300px; /* Mais altura para ver melhor */
+    border: none; 
+    background: white; /* Garante contraste */
+    border-radius: 12px; 
+    margin-top: 8px;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
 }
 
 /* CAMADA EXTERNA (Inject Outside) */
@@ -337,16 +341,87 @@ function toggleRender(id) {
     const frameBox = document.getElementById(`frame-container-${id}`);
     const item = items.find(i => i.id === id);
 
-    if (frameBox.style.display === 'none') {
-        // Ativar Warframe
+    // Se frameBox estiver vazio ou escondido, abrir preview
+    if (frameBox.style.display === 'none' || frameBox.innerHTML === '') {
+        // 1. Oculta o código fonte
         txt.style.display = 'none';
         frameBox.style.display = 'block';
-        frameBox.innerHTML = `<iframe class="warframe-view" srcdoc="${item.content.replace(/"/g, '&quot;')}" sandbox="allow-scripts"></iframe>`;
+        frameBox.innerHTML = ''; // garante limpeza antes de inserir
+
+        // 2. Cria a barra de ferramentas do render (Expandir/Fechar)
+        const toolbar = document.createElement('div');
+        toolbar.style.cssText = "display:flex; justify-content:flex-end; gap:8px; margin-bottom:6px;";
+
+        // Botão Expandir (Modo Cinema)
+        const btnExpand = document.createElement('button');
+        btnExpand.innerHTML = '⛶ Expandir';
+        btnExpand.className = 'tag-badge';
+        btnExpand.style.cursor = 'pointer';
+        btnExpand.onclick = function(e) {
+            e.stopPropagation();
+            const fs = document.createElement('div');
+            fs.style.cssText = "position:fixed; inset:0; z-index:9999; background:#000; padding:20px; display:flex; flex-direction:column;";
+            
+            const closeFs = document.createElement('button');
+            closeFs.innerText = "❌ Fechar Modo Cinema";
+            closeFs.style.cssText = "align-self:flex-end; padding:8px 16px; background:#ef4444; color:white; border:none; border-radius:6px; margin-bottom:10px; cursor:pointer; font-weight:bold;";
+            closeFs.onclick = () => fs.remove();
+
+            const bigFrame = document.createElement('iframe');
+            bigFrame.style.cssText = "width:100%; height:100%; border:none; background:#fff; border-radius:8px;";
+            // permitir scripts no fullscreen
+            bigFrame.setAttribute('sandbox', 'allow-scripts allow-modals allow-forms allow-same-origin');
+
+            fs.appendChild(closeFs);
+            fs.appendChild(bigFrame);
+            document.body.appendChild(fs);
+
+            // Injeta no Fullscreen (escreve direto para evitar problemas de aspas)
+            const doc = bigFrame.contentWindow.document;
+            doc.open();
+            doc.write(item.content);
+            doc.close();
+        };
+
+        toolbar.appendChild(btnExpand);
+
+        // Botão Fechar (apenas dentro da toolbar, para voltar ao modo código)
+        const btnClose = document.createElement('button');
+        btnClose.innerText = '✖ Fechar';
+        btnClose.className = 'tag-badge';
+        btnClose.style.cursor = 'pointer';
+        btnClose.onclick = function(e) {
+            e.stopPropagation();
+            // Voltar p/ Código
+            txt.style.display = 'block';
+            frameBox.style.display = 'none';
+            frameBox.innerHTML = '';
+        };
+        toolbar.appendChild(btnClose);
+
+        frameBox.appendChild(toolbar);
+
+        // 3. Cria o Iframe local (Preview)
+        const iframe = document.createElement('iframe');
+        iframe.className = 'warframe-view';
+        // Aumenta um pouco a altura padrão para visualização
+        iframe.style.height = "300px";
+        // permitir scripts no preview
+        iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+        frameBox.appendChild(iframe);
+
+        // 4. A MÁGICA: Escreve o conteúdo direto no documento do iframe
+        // Isso evita erros de aspas no srcdoc
+        const doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(item.content);
+        doc.close();
+
     } else {
-        // Voltar p/ Código
+        // Voltar para modo Código
         txt.style.display = 'block';
         frameBox.style.display = 'none';
-        frameBox.innerHTML = '';
+        frameBox.innerHTML = ''; // Limpa para economizar memória
     }
 }
 
